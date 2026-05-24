@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_colors.dart';
@@ -97,6 +98,7 @@ class AiNotifier extends StateNotifier<AiState> {
   }
 
   ChatSession? _geminiSession;
+  static const _secureStorage = FlutterSecureStorage();
 
   static const _systemPrompt = '''You are SIGMA — an elite emergency AI assistant embedded in an SOS Panic Button app designed for mountain and outdoor use.
 
@@ -121,7 +123,7 @@ IMPORTANT: If asked something unrelated to emergencies/outdoors, politely redire
 
     final keys = <AiProvider, String?>{};
     for (final prov in AiProvider.values) {
-      keys[prov] = prefs.getString(prov.prefKey);
+      keys[prov] = await _secureStorage.read(key: prov.prefKey);
     }
 
     state = state.copyWith(
@@ -140,9 +142,8 @@ IMPORTANT: If asked something unrelated to emergencies/outdoors, politely redire
   }
 
   Future<void> saveApiKey(String key) async {
-    final prefs = await SharedPreferences.getInstance();
     final provider = state.selectedProvider;
-    await prefs.setString(provider.prefKey, key.trim());
+    await _secureStorage.write(key: provider.prefKey, value: key.trim());
 
     final updatedKeys = Map<AiProvider, String?>.from(state.apiKeys);
     updatedKeys[provider] = key.trim();
@@ -152,9 +153,8 @@ IMPORTANT: If asked something unrelated to emergencies/outdoors, politely redire
   }
 
   Future<void> clearApiKey() async {
-    final prefs = await SharedPreferences.getInstance();
     final provider = state.selectedProvider;
-    await prefs.remove(provider.prefKey);
+    await _secureStorage.delete(key: provider.prefKey);
 
     final updatedKeys = Map<AiProvider, String?>.from(state.apiKeys);
     updatedKeys[provider] = null;
