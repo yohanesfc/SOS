@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/repositories/gps_repository.dart';
 import '../providers/sos_provider.dart';
@@ -449,6 +450,7 @@ class _QuickActions extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final sos = ref.read(sosProvider.notifier);
+    final posAsync = ref.watch(positionStreamProvider);
 
     return GridView.count(
       crossAxisCount: 2,
@@ -475,8 +477,169 @@ class _QuickActions extends ConsumerWidget {
         ),
         _QaButton(
           icon: '🗺', label: 'Location Info',
-          sub: 'OFFLINE MAP', active: false,
-          onTap: () {},
+          sub: 'GPS DETAILS', active: false,
+          onTap: () => _showLocationInfo(context, posAsync),
+        ),
+      ],
+    );
+  }
+
+  void _showLocationInfo(BuildContext context, AsyncValue<Position> posAsync) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Text('📍', style: TextStyle(fontSize: 22)),
+                const SizedBox(width: 10),
+                const Text('LOCATION INFO',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                      letterSpacing: 2,
+                    )),
+                const Spacer(),
+                GestureDetector(
+                  onTap: () => Navigator.pop(ctx),
+                  child: const Icon(Icons.close, color: AppColors.textDim, size: 20),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Divider(color: AppColors.border, height: 1),
+            const SizedBox(height: 16),
+            posAsync.when(
+              data: (pos) => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _InfoRow('LATITUDE',
+                      '${pos.latitude.toStringAsFixed(6)}° ${pos.latitude >= 0 ? 'N' : 'S'}'),
+                  const SizedBox(height: 10),
+                  _InfoRow('LONGITUDE',
+                      '${pos.longitude.toStringAsFixed(6)}° ${pos.longitude >= 0 ? 'E' : 'W'}'),
+                  const SizedBox(height: 10),
+                  _InfoRow('ELEVATION', '${pos.altitude.toStringAsFixed(1)} m'),
+                  const SizedBox(height: 10),
+                  _InfoRow('ACCURACY', '±${pos.accuracy.toStringAsFixed(0)} m'),
+                  const SizedBox(height: 10),
+                  _InfoRow('UPDATED', _formatTime(pos.timestamp)),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.green.withOpacity(0.15),
+                        foregroundColor: AppColors.green,
+                        side: const BorderSide(color: AppColors.green),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      icon: const Icon(Icons.map_outlined, size: 18),
+                      label: const Text('OPEN IN GOOGLE MAPS',
+                          style: TextStyle(fontFamily: 'monospace', fontSize: 11, letterSpacing: 1)),
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        final mapsUrl = Uri.parse(
+                          'geo:${pos.latitude},${pos.longitude}?q=${pos.latitude},${pos.longitude}&z=17',
+                        );
+                        // Try native geo: URI first (opens Google Maps on Android)
+                        if (await canLaunchUrl(mapsUrl)) {
+                          await launchUrl(mapsUrl);
+                        } else {
+                          // Fallback: open in browser
+                          final webUrl = Uri.parse(
+                            'https://maps.google.com/?q=${pos.latitude},${pos.longitude}',
+                          );
+                          await launchUrl(webUrl,
+                              mode: LaunchMode.externalApplication);
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              loading: () => const Center(
+                child: Column(
+                  children: [
+                    SizedBox(height: 8),
+                    CircularProgressIndicator(color: AppColors.green, strokeWidth: 2),
+                    SizedBox(height: 12),
+                    Text('Waiting for GPS signal...',
+                        style: TextStyle(fontFamily: 'monospace', fontSize: 12, color: AppColors.textDim)),
+                    SizedBox(height: 8),
+                  ],
+                ),
+              ),
+              error: (e, _) => Column(
+                children: [
+                  const Text('⚠', style: TextStyle(fontSize: 32)),
+                  const SizedBox(height: 8),
+                  const Text('Location permission required',
+                      style: TextStyle(fontFamily: 'monospace', fontSize: 12, color: AppColors.yellow)),
+                  const SizedBox(height: 4),
+                  const Text('Please grant location access in\nAndroid Settings → App Permissions',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontFamily: 'monospace', fontSize: 10, color: AppColors.textDim)),
+                  const SizedBox(height: 16),
+                  TextButton(
+                    onPressed: () {
+                      Geolocator.openAppSettings();
+                      Navigator.pop(ctx);
+                    },
+                    child: const Text('Open App Settings',
+                        style: TextStyle(fontFamily: 'monospace', color: AppColors.green, fontSize: 12)),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatTime(DateTime dt) =>
+      '${dt.hour.toString().padLeft(2,'0')}:${dt.minute.toString().padLeft(2,'0')}:${dt.second.toString().padLeft(2,'0')}';
+}
+
+// ── Info Row for Location Bottom Sheet ──
+class _InfoRow extends StatelessWidget {
+  final String label, value;
+  const _InfoRow(this.label, this.value);
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 90,
+          child: Text(label,
+              style: const TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 9,
+                color: AppColors.textDim,
+                letterSpacing: 1.5,
+              )),
+        ),
+        Expanded(
+          child: Text(value,
+              style: const TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 13,
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w600,
+              )),
         ),
       ],
     );

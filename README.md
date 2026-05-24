@@ -63,13 +63,9 @@ flutter pub run build_runner build --delete-conflicting-outputs
 Place an audio file named `siren.mp3` in the `assets/audio/` directory.  
 You can download one for free from freesound.org (CC0 license) — search for "emergency siren".
 
-### 5. Configure Google AI Studio (Optional)
-```dart
-// In main.dart or settings screen:
-final gemini = ref.read(geminiServiceProvider);
-gemini.init('YOUR_GEMINI_API_KEY');
-```
-Get a free API key at: https://aistudio.google.com
+### 5. Configure Google AI Studio (Gemini Integration)
+Get a free Gemini API key from [Google AI Studio](https://aistudio.google.com).
+Open the app, go to the **AI** tab, tap **Settings (Gear Icon)** in the top right, and paste your API key. The key is securely saved locally in your device's `SharedPreferences` and will remain persistent across sessions.
 
 ### 6. Run on Android
 ```bash
@@ -96,52 +92,42 @@ All required permissions are already configured in the `AndroidManifest.xml` fil
 
 | Permission | Purpose |
 |-----------|---------|
-| `ACCESS_FINE_LOCATION` | High-precision GPS |
+| `ACCESS_FINE_LOCATION` | High-precision GPS tracking |
 | `SEND_SMS` | Send emergency SMS messages in the background |
 | `CAMERA` | Access LED torch for Morse code SOS strobe |
 | `VIBRATE` | Haptic feedback for SOS interactions |
 | `FOREGROUND_SERVICE` | Keeps GPS active when the app is in the background |
-| `INTERNET` | Gemini AI integration (optional) |
+| `INTERNET` | Gemini AI integration |
 
 ---
 
-## 🧠 Google AI Studio — System Prompt
+## 🧠 SIGMA AI Assistant — System Architecture
 
-Copy & paste these instructions to Google AI Studio → System Instructions:
-```
-You are an emergency survival assistant named SIGMA (Mobile Emergency Information System).
-Assist the user in outdoor emergency situations with guidance on:
-- Basic first aid
-- Navigation and orientation
-- Survival techniques
-- Emergency communication
+SIGMA is configured as an elite wilderness and rescue assistant. The conversational brain leverages **Gemini 2.0 Flash** with a low-latency streaming format.
 
-RULES:
-- ALWAYS answer in English
-- Short, clear, and actionable (maximum 5 points)
-- Prioritize human life and safety above all else
-- If the situation is critical, always suggest calling emergency services (911, 112) or Search & Rescue
-- Never suggest actions that worsen the condition
-```
-
-Recommended Model: **gemini-2.0-flash** (lightweight, ultra-fast)
+Key prompt directions:
+- wilderness survival tactics (water extraction, signaling, shelter)
+- mountain & jungle navigation (compass, terrain reading, stars)
+- emergency first aid (hypothermia, fractures, bleeding, altitude sickness)
+- Morse code and whistle signal interpretations
 
 ---
 
-## 🗺️ Roadmap
+## 🗺️ Roadmap & Current Status
 
-- [x] SOS Button + Countdown anti-mispress protection
-- [x] Real-time GPS Tracking
-- [x] Emergency SMS containing exact coordinates  
-- [x] Digital Compass (Magnetometer)
-- [x] Morse Code SOS LED Strobe Light
-- [x] Loud Emergency Siren Audio
-- [x] Google AI Studio / Gemini Integration
-- [x] Contacts Management Screen (UI)
-- [x] Activity Log Screen (UI)
-- [x] Offline Reverse Geocoding (Global Prominent Peaks Database)
-- [x] Background GPS Foreground Service
-- [x] Google Play Store Submission Configuration
+- [x] **SOS Button + Countdown** (anti-mispress protection with hold-to-activate)
+- [x] **Real-time GPS Tracking** (streamed directly to main console)
+- [x] **Location Info & Google Maps** (tap for detailed coordinates and launch maps app via `geo:` protocol)
+- [x] **Emergency SMS** (sends instant SMS with coordinates to primary contacts)  
+- [x] **Digital Compass** (magnetometer-based orientation tracking)
+- [x] **Morse Code SOS LED Strobe Light** (hardware camera integration for visual beacons)
+- [x] **Loud Emergency Siren Audio** (high-frequency siren)
+- [x] **Sigma AI Assistant Screen** (active chat UI, Gemini 2.0 Flash, quick prompt suggestions)
+- [x] **Contacts Management Screen** (full Hive-backed CRUD operations for contacts)
+- [x] **Activity Log Screen** (persistent database recording SOS and sensor trigger logs)
+- [x] **Offline Reverse Geocoding** (points database lookup)
+- [x] **Background GPS Foreground Service** (continues updating location in background)
+- [x] **Custom App Launcher Icon** (branded dark SOS launcher icon with red warning theme)
 
 ---
 

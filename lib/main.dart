@@ -12,6 +12,7 @@ import 'presentation/screens/sos_screen.dart';
 import 'presentation/screens/compass_screen.dart';
 import 'presentation/screens/contacts_screen.dart';
 import 'presentation/screens/log_screen.dart';
+import 'presentation/screens/ai_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -86,7 +87,7 @@ class _MainShellState extends ConsumerState<MainShell> {
     (label: 'COMPASS',    icon: Icons.explore,                 screen: CompassScreen()),
     (label: 'CONTACTS',   icon: Icons.contacts,                screen: ContactsScreen()),
     (label: 'LOGS',       icon: Icons.history,                 screen: LogScreen()),
-    (label: 'AI',         icon: Icons.psychology,              screen: _AiPlaceholder()),
+    (label: 'AI',         icon: Icons.psychology,              screen: AiScreen()),
   ];
 
   @override
@@ -170,14 +171,3 @@ class _MainShellState extends ConsumerState<MainShell> {
   }
 }
 
-// ── Placeholder screens ──
-
-
-class _AiPlaceholder extends StatelessWidget {
-  const _AiPlaceholder();
-  @override
-  Widget build(BuildContext context) => const Center(
-    child: Text('SIGMA AI Assistant\n(Gemini integration)', textAlign: TextAlign.center,
-      style: TextStyle(fontFamily: 'monospace', color: AppColors.textDim, fontSize: 13)),
-  );
-}

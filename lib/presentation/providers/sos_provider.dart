@@ -32,41 +32,47 @@ class SosNotifier extends StateNotifier<SosState> {
   }
 
   void _listenToBackgroundService() {
-    try {
-      final service = FlutterBackgroundService();
-      service.on('updateLocation').listen((event) {
-        if (event != null) {
-          final double lat = event['latitude'];
-          final double lng = event['longitude'];
-          final double acc = event['accuracy'];
-          final double alt = event['altitude'];
-          
-          final newPos = Position(
-            latitude: lat,
-            longitude: lng,
-            timestamp: DateTime.now(),
-            accuracy: acc,
-            altitude: alt,
-            heading: 0,
-            headingAccuracy: 0,
-            speed: 0,
-            speedAccuracy: 0,
-            altitudeAccuracy: 0,
-          );
-          
-          _lastPosition = newPos;
-          
-          // Resolve offline geocoding
-          OfflineGeocodingService().resolveLocation(lat, lng).then((resolved) {
-            if (resolved != null) {
-              _ref.read(resolvedAddressProvider.notifier).state = resolved;
-            }
-          });
-        }
-      });
-    } catch (e) {
-      print('--- Background GPS Listener Error: $e ---');
-    }
+    // Delay listener attachment to avoid calling into background service
+    // before it has been configured (causes isolate/main-isolate errors).
+    Future.delayed(const Duration(seconds: 2), () {
+      try {
+        final service = FlutterBackgroundService();
+        service.on('updateLocation').listen((event) {
+          if (event != null) {
+            final double lat = (event['latitude'] as num).toDouble();
+            final double lng = (event['longitude'] as num).toDouble();
+            final double acc = (event['accuracy'] as num).toDouble();
+            final double alt = (event['altitude'] as num).toDouble();
+
+            final newPos = Position(
+              latitude: lat,
+              longitude: lng,
+              timestamp: DateTime.now(),
+              accuracy: acc,
+              altitude: alt,
+              heading: 0,
+              headingAccuracy: 0,
+              speed: 0,
+              speedAccuracy: 0,
+              altitudeAccuracy: 0,
+            );
+
+            _lastPosition = newPos;
+
+            // Resolve offline geocoding
+            OfflineGeocodingService().resolveLocation(lat, lng).then((resolved) {
+              if (resolved != null) {
+                _ref.read(resolvedAddressProvider.notifier).state = resolved;
+              }
+            });
+          }
+        }, onError: (e) {
+          print('--- Background GPS Stream Error: $e ---');
+        });
+      } catch (e) {
+        print('--- Background GPS Listener Error: $e ---');
+      }
+    });
   }
 
   int get remainingSeconds => _countdown;

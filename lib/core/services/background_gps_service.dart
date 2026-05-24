@@ -4,6 +4,7 @@ import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:geolocator/geolocator.dart';
 
+@pragma('vm:entry-point')
 class BackgroundGpsService {
   static const String notificationChannelId = 'sos_gps_channel';
   static const int notificationId = 888;

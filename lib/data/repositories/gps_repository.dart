@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -15,15 +16,21 @@ class GpsRepository {
     );
   }
 
-  /// Stream of position updates (for real-time tracking)
-  Stream<Position> getPositionStream() {
+  /// Stream of position updates — requests permission first
+  Stream<Position> getPositionStream() async* {
+    final granted = await _ensurePermission();
+    if (!granted) {
+      throw Exception('Location permission denied or service disabled');
+    }
+
     _positionStream = Geolocator.getPositionStream(
       locationSettings: const LocationSettings(
         accuracy: LocationAccuracy.best,
-        distanceFilter: 5, // update every 5m movement
+        distanceFilter: 5,
       ),
     );
-    return _positionStream!;
+
+    yield* _positionStream!;
   }
 
   Future<bool> _ensurePermission() async {
@@ -34,6 +41,7 @@ class GpsRepository {
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
     }
+    if (permission == LocationPermission.deniedForever) return false;
     return permission == LocationPermission.whileInUse ||
            permission == LocationPermission.always;
   }
@@ -62,5 +70,8 @@ final currentPositionProvider = FutureProvider<Position?>((ref) async {
 
 final positionStreamProvider = StreamProvider<Position>((ref) {
   final repo = ref.read(gpsRepositoryProvider);
-  return repo.getPositionStream();
+  return repo.getPositionStream().handleError((e) {
+    // Errors (permission denied) are shown in the UI via the error() builder
+  });
 });
+

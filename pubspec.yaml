@@ -67,6 +67,7 @@ dev_dependencies:
   riverpod_generator: ^2.4.0
   hive_generator: ^2.0.1
   json_serializable: ^6.7.1
+  flutter_launcher_icons: ^0.14.3
 
 flutter:
   uses-material-design: true
@@ -74,3 +75,15 @@ flutter:
     - assets/audio/siren.mp3
     - assets/data/
     - assets/images/
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/app_icon.png"
+  adaptive_icon_background: "#0D0D0D"
+  adaptive_icon_foreground: "assets/images/app_icon.png"
+  min_sdk_android: 21
+  web:
+    generate: false
+  windows:
+    generate: false
