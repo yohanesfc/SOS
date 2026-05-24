@@ -1,7 +1,7 @@
 # 🚨 S.O.S Panic Button — Flutter App
 
 <p align="center">
-  <img src="assets/images/play_store_icon.png" width="180" height="180" alt="S.O.S Panic Button Logo" />
+  <img src="assets/images/app_icon.png" width="180" height="180" alt="S.O.S Panic Button Logo" />
 </p>
 
 An offline emergency app for mountain climbers, hikers, and general outdoor survival.  
