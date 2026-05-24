@@ -1,0 +1,75 @@
+name: sos_panic_button
+description: S.O.S Panic Button — Emergency App for Mountain & Outdoor Use
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+  flutter: '>=3.19.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State Management
+  flutter_riverpod: ^2.5.1
+  riverpod_annotation: ^2.3.4
+
+  # GPS / Location
+  geolocator: ^12.0.0
+  geocoding: ^3.0.0
+
+  # Compass / Device Sensors
+  flutter_compass: ^0.8.0
+  sensors_plus: ^4.0.2
+
+  # SMS (maintained fork of telephony — same API)
+  another_telephony: ^0.4.1
+
+  # LED Torch
+  torch_light: ^1.0.0
+
+  # Audio
+  audioplayers: ^6.0.0
+
+  # Local Storage (Offline)
+  hive_flutter: ^1.1.0
+  hive: ^2.2.3
+
+  # Permissions
+  permission_handler: ^11.3.1
+
+  # Background Services
+  flutter_background_service: ^5.0.5
+  flutter_local_notifications: ^17.1.2
+
+  # Google AI Studio (Gemini)
+  google_generative_ai: ^0.4.3
+
+  # Utilities
+  intl: ^0.20.2
+  shared_preferences: ^2.2.3
+  connectivity_plus: ^6.0.3
+  wakelock_plus: ^1.2.5
+  vibration: ^3.1.8
+  url_launcher: ^6.3.0
+
+  # UI Extras
+  cupertino_icons: ^1.0.6
+  flutter_animate: ^4.5.0
+  google_fonts: ^6.2.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+  build_runner: ^2.4.9
+  riverpod_generator: ^2.4.0
+  hive_generator: ^2.0.1
+  json_serializable: ^6.7.1
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/audio/siren.mp3
+    - assets/data/
