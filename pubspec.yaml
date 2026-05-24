@@ -45,6 +45,7 @@ dependencies:
 
   # Google AI Studio (Gemini)
   google_generative_ai: ^0.4.3
+  http: ^1.2.1
 
   # Utilities
   intl: ^0.20.2

@@ -1,9 +1,51 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_colors.dart';
+
+// ── Providers ──
+enum AiProvider {
+  gemini(
+    displayName: 'Gemini 2.0 Flash',
+    modelName: 'gemini-2.0-flash',
+    prefKey: 'gemini_api_key',
+    developer: 'Google',
+    logo: '♊',
+  ),
+  claude(
+    displayName: 'Claude 3.5 Sonnet',
+    modelName: 'claude-3-5-sonnet-20241022',
+    prefKey: 'claude_api_key',
+    developer: 'Anthropic',
+    logo: '🎴',
+  ),
+  grok(
+    displayName: 'Grok 2',
+    modelName: 'grok-2-1212',
+    prefKey: 'grok_api_key',
+    developer: 'xAI',
+    logo: '🌌',
+  );
+
+  final String displayName;
+  final String modelName;
+  final String prefKey;
+  final String developer;
+  final String logo;
+
+  const AiProvider({
+    required this.displayName,
+    required this.modelName,
+    required this.prefKey,
+    required this.developer,
+    required this.logo,
+  });
+}
 
 // ── Model ──
 class ChatMessage {
@@ -17,39 +59,44 @@ class ChatMessage {
 class AiState {
   final List<ChatMessage> messages;
   final bool isLoading;
-  final bool hasApiKey;
   final String? error;
+  final AiProvider selectedProvider;
+  final Map<AiProvider, String?> apiKeys;
 
   const AiState({
     this.messages = const [],
     this.isLoading = false,
-    this.hasApiKey = false,
     this.error,
+    this.selectedProvider = AiProvider.gemini,
+    this.apiKeys = const {},
   });
+
+  bool get hasApiKey => apiKeys[selectedProvider]?.isNotEmpty ?? false;
+  String? get activeApiKey => apiKeys[selectedProvider];
 
   AiState copyWith({
     List<ChatMessage>? messages,
     bool? isLoading,
-    bool? hasApiKey,
     String? error,
+    AiProvider? selectedProvider,
+    Map<AiProvider, String?>? apiKeys,
   }) =>
       AiState(
         messages: messages ?? this.messages,
         isLoading: isLoading ?? this.isLoading,
-        hasApiKey: hasApiKey ?? this.hasApiKey,
         error: error,
+        selectedProvider: selectedProvider ?? this.selectedProvider,
+        apiKeys: apiKeys ?? this.apiKeys,
       );
 }
 
 // ── Notifier ──
 class AiNotifier extends StateNotifier<AiState> {
   AiNotifier() : super(const AiState()) {
-    _loadApiKey();
+    _loadState();
   }
 
-  static const _keyPref = 'gemini_api_key';
-  String? _apiKey;
-  ChatSession? _session;
+  ChatSession? _geminiSession;
 
   static const _systemPrompt = '''You are SIGMA — an elite emergency AI assistant embedded in an SOS Panic Button app designed for mountain and outdoor use.
 
@@ -66,54 +113,91 @@ Format: Use bullet points. Bold key actions. Keep it actionable.
 Language: Respond in the same language as the user.
 IMPORTANT: If asked something unrelated to emergencies/outdoors, politely redirect to your mission.''';
 
-  Future<void> _loadApiKey() async {
+  Future<void> _loadState() async {
     final prefs = await SharedPreferences.getInstance();
-    final key = prefs.getString(_keyPref);
-    if (key != null && key.isNotEmpty) {
-      _apiKey = key;
-      _initSession();
-      state = state.copyWith(hasApiKey: true);
+    
+    final activeProvIndex = prefs.getInt('active_ai_provider') ?? 0;
+    final activeProvider = AiProvider.values[activeProvIndex.clamp(0, AiProvider.values.length - 1)];
+
+    final keys = <AiProvider, String?>{};
+    for (final prov in AiProvider.values) {
+      keys[prov] = prefs.getString(prov.prefKey);
     }
+
+    state = state.copyWith(
+      selectedProvider: activeProvider,
+      apiKeys: keys,
+    );
+
+    _initSession();
+  }
+
+  Future<void> selectProvider(AiProvider provider) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('active_ai_provider', provider.index);
+    state = state.copyWith(selectedProvider: provider, error: null);
+    _initSession();
   }
 
   Future<void> saveApiKey(String key) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_keyPref, key.trim());
-    _apiKey = key.trim();
+    final provider = state.selectedProvider;
+    await prefs.setString(provider.prefKey, key.trim());
+
+    final updatedKeys = Map<AiProvider, String?>.from(state.apiKeys);
+    updatedKeys[provider] = key.trim();
+
+    state = state.copyWith(apiKeys: updatedKeys, error: null);
     _initSession();
-    state = state.copyWith(hasApiKey: true, error: null);
   }
 
   Future<void> clearApiKey() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_keyPref);
-    _apiKey = null;
-    _session = null;
-    state = AiState();
+    final provider = state.selectedProvider;
+    await prefs.remove(provider.prefKey);
+
+    final updatedKeys = Map<AiProvider, String?>.from(state.apiKeys);
+    updatedKeys[provider] = null;
+
+    _geminiSession = null;
+    state = state.copyWith(apiKeys: updatedKeys, messages: [], error: null);
   }
 
   void _initSession() {
-    if (_apiKey == null) return;
-    try {
-      final model = GenerativeModel(
-        model: 'gemini-2.0-flash',
-        apiKey: _apiKey!,
-        systemInstruction: Content.system(_systemPrompt),
-        generationConfig: GenerationConfig(
-          temperature: 0.7,
-          maxOutputTokens: 1024,
-        ),
-      );
-      _session = model.startChat();
-    } catch (e) {
-      state = state.copyWith(error: 'Failed to initialize AI: $e');
+    final key = state.activeApiKey;
+    if (key == null || key.isEmpty) return;
+
+    if (state.selectedProvider == AiProvider.gemini) {
+      try {
+        final model = GenerativeModel(
+          model: AiProvider.gemini.modelName,
+          apiKey: key,
+          systemInstruction: Content.system(_systemPrompt),
+          generationConfig: GenerationConfig(
+            temperature: 0.7,
+            maxOutputTokens: 1024,
+          ),
+        );
+        _geminiSession = model.startChat();
+      } catch (e) {
+        state = state.copyWith(error: 'Failed to initialize Gemini: $e');
+      }
+    } else {
+      _geminiSession = null;
     }
   }
 
   Future<void> sendMessage(String text) async {
-    if (text.trim().isEmpty || _session == null) return;
+    final userText = text.trim();
+    if (userText.isEmpty) return;
 
-    final userMsg = ChatMessage(text: text.trim(), isUser: true, time: DateTime.now());
+    final key = state.activeApiKey;
+    if (key == null || key.isEmpty) {
+      state = state.copyWith(error: 'Missing API Key for ${state.selectedProvider.displayName}');
+      return;
+    }
+
+    final userMsg = ChatMessage(text: userText, isUser: true, time: DateTime.now());
     state = state.copyWith(
       messages: [...state.messages, userMsg],
       isLoading: true,
@@ -121,8 +205,19 @@ IMPORTANT: If asked something unrelated to emergencies/outdoors, politely redire
     );
 
     try {
-      final response = await _session!.sendMessage(Content.text(text.trim()));
-      final reply = response.text ?? 'No response from SIGMA.';
+      String reply = '';
+      if (state.selectedProvider == AiProvider.gemini) {
+        if (_geminiSession == null) _initSession();
+        if (_geminiSession == null) throw Exception('Gemini session is uninitialized');
+        
+        final response = await _geminiSession!.sendMessage(Content.text(userText));
+        reply = response.text ?? 'No response from SIGMA.';
+      } else if (state.selectedProvider == AiProvider.claude) {
+        reply = await _callClaude(userText, key);
+      } else if (state.selectedProvider == AiProvider.grok) {
+        reply = await _callGrok(userText, key);
+      }
+
       final aiMsg = ChatMessage(text: reply, isUser: false, time: DateTime.now());
       state = state.copyWith(
         messages: [...state.messages, aiMsg],
@@ -131,14 +226,104 @@ IMPORTANT: If asked something unrelated to emergencies/outdoors, politely redire
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
-        error: 'Error: ${e.toString().replaceAll('GenerativeAIException:', '').trim()}',
+        error: 'Error: ${e.toString().replaceAll('Exception:', '').trim()}',
       );
     }
   }
 
+  Future<String> _callClaude(String text, String apiKey) async {
+    final url = Uri.parse('https://api.anthropic.com/v1/messages');
+
+    final messagesPayload = <Map<String, dynamic>>[];
+    final recentMessages = state.messages.sublist(
+      (state.messages.length - 7).clamp(0, state.messages.length),
+    );
+
+    for (final m in recentMessages) {
+      messagesPayload.add({
+        'role': m.isUser ? 'user' : 'assistant',
+        'content': m.text,
+      });
+    }
+
+    final response = await http.post(
+      url,
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: jsonEncode({
+        'model': AiProvider.claude.modelName,
+        'max_tokens': 1024,
+        'system': _systemPrompt,
+        'messages': messagesPayload,
+        'temperature': 0.7,
+      }),
+    ).timeout(const Duration(seconds: 15));
+
+    if (response.statusCode != 200) {
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      final errMsg = decoded['error']?['message'] ?? 'Status ${response.statusCode}';
+      throw Exception('Claude error: $errMsg');
+    }
+
+    final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+    final contentList = decoded['content'] as List;
+    if (contentList.isNotEmpty) {
+      return contentList[0]['text'] ?? 'No text response from Claude.';
+    }
+    return 'No response from Claude.';
+  }
+
+  Future<String> _callGrok(String text, String apiKey) async {
+    final url = Uri.parse('https://api.x.ai/v1/chat/completions');
+
+    final messagesPayload = <Map<String, dynamic>>[
+      {'role': 'system', 'content': _systemPrompt}
+    ];
+
+    final recentMessages = state.messages.sublist(
+      (state.messages.length - 7).clamp(0, state.messages.length),
+    );
+
+    for (final m in recentMessages) {
+      messagesPayload.add({
+        'role': m.isUser ? 'user' : 'assistant',
+        'content': m.text,
+      });
+    }
+
+    final response = await http.post(
+      url,
+      headers: {
+        'Authorization': 'Bearer $apiKey',
+        'content-type': 'application/json',
+      },
+      body: jsonEncode({
+        'model': AiProvider.grok.modelName,
+        'messages': messagesPayload,
+        'temperature': 0.7,
+      }),
+    ).timeout(const Duration(seconds: 15));
+
+    if (response.statusCode != 200) {
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      final errMsg = decoded['error']?['message'] ?? 'Status ${response.statusCode}';
+      throw Exception('Grok error: $errMsg');
+    }
+
+    final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+    final choices = decoded['choices'] as List;
+    if (choices.isNotEmpty) {
+      return choices[0]['message']?['content'] ?? 'No content from Grok.';
+    }
+    return 'No response from Grok.';
+  }
+
   void clearChat() {
-    _initSession(); // fresh session
     state = state.copyWith(messages: [], error: null);
+    _initSession();
   }
 }
 
@@ -202,7 +387,6 @@ class _AiScreenState extends ConsumerState<AiScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(aiProvider);
 
-    // Auto scroll on new messages
     if (state.messages.isNotEmpty) _scrollToBottom();
 
     return Column(
@@ -210,8 +394,11 @@ class _AiScreenState extends ConsumerState<AiScreen> {
         // ── Header ──
         _buildHeader(state),
 
+        // ── Active Provider Selector ──
+        _buildProviderSelector(state),
+
         if (!state.hasApiKey || _showApiKeyInput) ...[
-          _buildApiKeyPanel(),
+          _buildApiKeyPanel(state),
         ] else ...[
           // ── Quick prompts (only when no messages) ──
           if (state.messages.isEmpty) _buildQuickPrompts(),
@@ -257,7 +444,7 @@ class _AiScreenState extends ConsumerState<AiScreen> {
             children: [
               const Text('SIGMA AI', style: TextStyle(fontFamily: 'monospace', fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary, letterSpacing: 2)),
               Text(
-                state.hasApiKey ? '● ONLINE · Gemini 2.0 Flash' : '○ API KEY REQUIRED',
+                state.hasApiKey ? '● ONLINE · ${state.selectedProvider.displayName}' : '○ API KEY REQUIRED',
                 style: TextStyle(
                   fontFamily: 'monospace',
                   fontSize: 9,
@@ -282,7 +469,14 @@ class _AiScreenState extends ConsumerState<AiScreen> {
                 size: 20,
               ),
               tooltip: 'API Key settings',
-              onPressed: () => setState(() => _showApiKeyInput = !_showApiKeyInput),
+              onPressed: () {
+                setState(() {
+                  _showApiKeyInput = !_showApiKeyInput;
+                  if (_showApiKeyInput) {
+                    _apiKeyCtrl.text = state.activeApiKey ?? '';
+                  }
+                });
+              },
             ),
           ],
         ],
@@ -290,30 +484,140 @@ class _AiScreenState extends ConsumerState<AiScreen> {
     );
   }
 
-  Widget _buildApiKeyPanel() {
+  Widget _buildProviderSelector(AiState state) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        border: Border(bottom: BorderSide(color: AppColors.border)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: AiProvider.values.map((prov) {
+          final isSelected = state.selectedProvider == prov;
+          final hasKey = state.apiKeys[prov]?.isNotEmpty ?? false;
+          
+          return Expanded(
+            child: GestureDetector(
+              onTap: () {
+                ref.read(aiProvider.notifier).selectProvider(prov);
+                if (_showApiKeyInput || !hasKey) {
+                  _apiKeyCtrl.text = state.apiKeys[prov] ?? '';
+                }
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: isSelected 
+                      ? const Color(0xFF8B00FF).withOpacity(0.12)
+                      : AppColors.bg,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: isSelected 
+                        ? const Color(0xFF8B00FF)
+                        : AppColors.border,
+                    width: isSelected ? 1.5 : 1,
+                  ),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(prov.logo, style: const TextStyle(fontSize: 12)),
+                        const SizedBox(width: 4),
+                        Text(
+                          prov.name.split(' ')[0],
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: isSelected ? Colors.white : AppColors.textDim,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      hasKey ? 'ACTIVE' : 'KEY MISSING',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 8,
+                        fontWeight: FontWeight.w500,
+                        color: hasKey ? AppColors.green : AppColors.textDim,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildApiKeyPanel(AiState state) {
+    String desc = '';
+    String hint = '';
+    String linkText = '';
+    String linkUrl = '';
+
+    switch (state.selectedProvider) {
+      case AiProvider.gemini:
+        desc = 'Emergency survival AI powered by Gemini.\nEnter your Google AI Studio API key to activate.';
+        hint = 'AIzaSy...';
+        linkText = 'Get free API key at aistudio.google.com →';
+        linkUrl = 'https://aistudio.google.com';
+        break;
+      case AiProvider.claude:
+        desc = 'Emergency survival AI powered by Claude 3.5 Sonnet.\nEnter your Anthropic Console API key to activate.';
+        hint = 'sk-ant-api03...';
+        linkText = 'Get API key at console.anthropic.com →';
+        linkUrl = 'https://console.anthropic.com';
+        break;
+      case AiProvider.grok:
+        desc = 'Emergency survival AI powered by Grok 2.\nEnter your xAI API key to activate.';
+        hint = 'xai-...';
+        linkText = 'Get API key at console.x.ai →';
+        linkUrl = 'https://console.x.ai';
+        break;
+    }
+
     return Expanded(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            const SizedBox(height: 10),
             Container(
               width: 80, height: 80,
               decoration: BoxDecoration(
                 gradient: const LinearGradient(colors: [Color(0xFF8B00FF), Color(0xFFCC00FF)]),
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: const Center(
-                child: Text('Σ', style: TextStyle(color: Colors.white, fontSize: 44, fontWeight: FontWeight.bold)),
+              child: Center(
+                child: Text(
+                  state.selectedProvider.logo, 
+                  style: const TextStyle(color: Colors.white, fontSize: 40)
+                ),
               ),
             ),
             const SizedBox(height: 20),
-            const Text('SIGMA AI ASSISTANT', style: TextStyle(fontFamily: 'monospace', fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary, letterSpacing: 2)),
-            const SizedBox(height: 8),
-            const Text(
-              'Emergency survival AI powered by Gemini.\nEnter your Google AI Studio API key to activate.',
+            Text(
+              'SIGMA · ${state.selectedProvider.displayName.toUpperCase()}', 
               textAlign: TextAlign.center,
-              style: TextStyle(fontFamily: 'monospace', fontSize: 11, color: AppColors.textDim, height: 1.6),
+              style: const TextStyle(fontFamily: 'monospace', fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary, letterSpacing: 2)
+            ),
+            const SizedBox(height: 8),
+            Text(
+              desc,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontFamily: 'monospace', fontSize: 11, color: AppColors.textDim, height: 1.6),
             ),
             const SizedBox(height: 24),
             TextField(
@@ -321,7 +625,7 @@ class _AiScreenState extends ConsumerState<AiScreen> {
               obscureText: true,
               style: const TextStyle(fontFamily: 'monospace', fontSize: 13, color: AppColors.textPrimary),
               decoration: InputDecoration(
-                hintText: 'AIza...',
+                hintText: hint,
                 hintStyle: const TextStyle(fontFamily: 'monospace', color: AppColors.textDim),
                 filled: true,
                 fillColor: AppColors.bg,
@@ -358,17 +662,56 @@ class _AiScreenState extends ConsumerState<AiScreen> {
                     setState(() => _showApiKeyInput = false);
                   }
                 },
-                child: const Text('ACTIVATE SIGMA', style: TextStyle(fontFamily: 'monospace', fontSize: 13, letterSpacing: 2, fontWeight: FontWeight.bold)),
+                child: Text(
+                  'ACTIVATE ${state.selectedProvider.name.toUpperCase()}', 
+                  style: const TextStyle(fontFamily: 'monospace', fontSize: 13, letterSpacing: 2, fontWeight: FontWeight.bold)
+                ),
               ),
             ),
+            if (state.hasApiKey) ...[
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.red,
+                    side: const BorderSide(color: AppColors.red),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: () {
+                    ref.read(aiProvider.notifier).clearApiKey();
+                    _apiKeyCtrl.clear();
+                  },
+                  child: const Text('DEACTIVATE & REMOVE KEY', style: TextStyle(fontFamily: 'monospace', fontSize: 13, letterSpacing: 2, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
             const SizedBox(height: 16),
             TextButton(
-              onPressed: () {},
-              child: const Text(
-                'Get free API key at aistudio.google.com →',
-                style: TextStyle(fontFamily: 'monospace', fontSize: 10, color: Color(0xFF8B00FF), letterSpacing: 0.5),
+              onPressed: () async {
+                final uri = Uri.parse(linkUrl);
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
+              },
+              child: Text(
+                linkText,
+                style: const TextStyle(fontFamily: 'monospace', fontSize: 10, color: Color(0xFF8B00FF), letterSpacing: 0.5),
               ),
             ),
+            if (state.hasApiKey) ...[
+              const SizedBox(height: 4),
+              TextButton(
+                onPressed: () {
+                  setState(() => _showApiKeyInput = false);
+                },
+                child: const Text(
+                  'Cancel & back to chat',
+                  style: TextStyle(fontFamily: 'monospace', fontSize: 10, color: AppColors.textDim, letterSpacing: 0.5),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -419,9 +762,9 @@ class _AiScreenState extends ConsumerState<AiScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Text('Σ', style: TextStyle(fontSize: 60, color: Color(0xFF3D0060))),
+            Text(state.selectedProvider.logo, style: const TextStyle(fontSize: 50)),
             const SizedBox(height: 8),
-            const Text('SIGMA is ready', style: TextStyle(fontFamily: 'monospace', fontSize: 12, color: AppColors.textDim)),
+            Text('${state.selectedProvider.displayName} is ready', style: const TextStyle(fontFamily: 'monospace', fontSize: 12, color: AppColors.textDim)),
             const Text('Ask me anything about survival & emergencies',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontFamily: 'monospace', fontSize: 10, color: AppColors.textDim)),
@@ -435,13 +778,13 @@ class _AiScreenState extends ConsumerState<AiScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       itemCount: state.messages.length + (state.isLoading ? 1 : 0),
       itemBuilder: (ctx, i) {
-        if (i == state.messages.length) return _buildTypingIndicator();
-        return _buildMessageBubble(state.messages[i]);
+        if (i == state.messages.length) return _buildTypingIndicator(state);
+        return _buildMessageBubble(state.messages[i], state);
       },
     );
   }
 
-  Widget _buildMessageBubble(ChatMessage msg) {
+  Widget _buildMessageBubble(ChatMessage msg, AiState state) {
     final isUser = msg.isUser;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -457,7 +800,12 @@ class _AiScreenState extends ConsumerState<AiScreen> {
                 gradient: const LinearGradient(colors: [Color(0xFF8B00FF), Color(0xFFCC00FF)]),
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: const Center(child: Text('Σ', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold))),
+              child: Center(
+                child: Text(
+                  state.selectedProvider.logo, 
+                  style: const TextStyle(color: Colors.white, fontSize: 12)
+                )
+              ),
             ),
           ],
           Flexible(
@@ -517,7 +865,7 @@ class _AiScreenState extends ConsumerState<AiScreen> {
     );
   }
 
-  Widget _buildTypingIndicator() {
+  Widget _buildTypingIndicator(AiState state) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
@@ -529,7 +877,12 @@ class _AiScreenState extends ConsumerState<AiScreen> {
               gradient: const LinearGradient(colors: [Color(0xFF8B00FF), Color(0xFFCC00FF)]),
               borderRadius: BorderRadius.circular(6),
             ),
-            child: const Center(child: Text('Σ', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold))),
+            child: Center(
+              child: Text(
+                state.selectedProvider.logo, 
+                style: const TextStyle(color: Colors.white, fontSize: 12)
+              )
+            ),
           ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

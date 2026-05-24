@@ -61,11 +61,13 @@ flutter pub run build_runner build --delete-conflicting-outputs
 
 ### 4. Add Audio Asset
 Place an audio file named `siren.mp3` in the `assets/audio/` directory.  
-You can download one for free from freesound.org (CC0 license) — search for "emergency siren".
+You can download one for free from freesound.org (CC0 license) — search for "emergency siren".### 5. Configure AI Provider Integrations (Gemini, Claude, Grok)
+SIGMA supports multiple premium AI engines. You can easily switch between providers directly in the app's AI tab:
+* **Gemini 2.0 Flash** (powered by Google AI Studio)
+* **Claude 3.5 Sonnet** (powered by Anthropic Console)
+* **Grok 2** (powered by xAI)
 
-### 5. Configure Google AI Studio (Gemini Integration)
-Get a free Gemini API key from [Google AI Studio](https://aistudio.google.com).
-Open the app, go to the **AI** tab, tap **Settings (Gear Icon)** in the top right, and paste your API key. The key is securely saved locally in your device's `SharedPreferences` and will remain persistent across sessions.
+Open the app, navigate to the **AI** tab, tap the active model selector to choose your provider, tap **Settings (Gear Icon)** in the top right, and paste your API key. Keys are securely stored locally on your device's `SharedPreferences` and remain persistent across sessions.
 
 ### 6. Run on Android
 ```bash
@@ -97,19 +99,20 @@ All required permissions are already configured in the `AndroidManifest.xml` fil
 | `CAMERA` | Access LED torch for Morse code SOS strobe |
 | `VIBRATE` | Haptic feedback for SOS interactions |
 | `FOREGROUND_SERVICE` | Keeps GPS active when the app is in the background |
-| `INTERNET` | Gemini AI integration |
+| `INTERNET` | API requests for Gemini, Claude, and Grok integrations |
 
 ---
 
 ## 🧠 SIGMA AI Assistant — System Architecture
 
-SIGMA is configured as an elite wilderness and rescue assistant. The conversational brain leverages **Gemini 2.0 Flash** with a low-latency streaming format.
+SIGMA is configured as an elite wilderness and rescue assistant. The conversational brain dynamically supports Google, Anthropic, and xAI architectures with conversational history tracking (up to last 7 messages for conversational memory).
 
 Key prompt directions:
 - wilderness survival tactics (water extraction, signaling, shelter)
 - mountain & jungle navigation (compass, terrain reading, stars)
 - emergency first aid (hypothermia, fractures, bleeding, altitude sickness)
 - Morse code and whistle signal interpretations
+- Low-latency HTTP/SDK streaming integrations
 
 ---
 
