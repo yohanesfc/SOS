@@ -13,6 +13,7 @@ class SmsRepository {
     required List<EmergencyContact> contacts,
     required Position position,
     required String senderName,
+    String? resolvedAddress,
   }) async {
     final hasPermission = await requestPermission();
     if (!hasPermission) {
@@ -26,10 +27,13 @@ class SmsRepository {
     final alt = position.altitude.toStringAsFixed(0);
     final acc = position.accuracy.toStringAsFixed(0);
 
+    final resolvedLine = resolvedAddress != null ? '($resolvedAddress)\n' : '';
+
     final smsBody = '🚨 EMERGENCY SOS 🚨\n'
         '$senderName needs immediate assistance!\n\n'
         '📍 LOCATION:\n'
         'Lat: $lat, Lng: $lng\n'
+        '$resolvedLine'
         '⬆ Elevation: ${alt}m | Accuracy: ±${acc}m\n\n'
         '⏰ Time: $timeStr\n'
         '🗺 https://maps.google.com/?q=${position.latitude},${position.longitude}\n\n'

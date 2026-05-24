@@ -5,6 +5,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/app_colors.dart';
+import 'core/services/background_gps_service.dart';
 import 'data/models/emergency_contact.dart';
 import 'data/models/activity_log.dart';
 import 'presentation/screens/sos_screen.dart';
@@ -14,6 +15,9 @@ import 'presentation/screens/log_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize background GPS tracking service
+  await BackgroundGpsService.initialize();
 
   // Force portrait mode
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);

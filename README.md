@@ -135,9 +135,9 @@ Recommended Model: **gemini-2.0-flash** (lightweight, ultra-fast)
 - [x] Google AI Studio / Gemini Integration
 - [x] Contacts Management Screen (UI)
 - [x] Activity Log Screen (UI)
-- [ ] Offline Reverse Geocoding
-- [ ] Background GPS Service
-- [ ] Google Play Store Submission
+- [x] Offline Reverse Geocoding (Global Prominent Peaks Database)
+- [x] Background GPS Foreground Service
+- [x] Google Play Store Submission Configuration
 
 ---
 

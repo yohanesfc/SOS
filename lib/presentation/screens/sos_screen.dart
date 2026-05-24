@@ -51,12 +51,14 @@ class SosScreen extends ConsumerWidget {
 }
 
 // ── GPS Bar ──
-class _GpsBar extends StatelessWidget {
+class _GpsBar extends ConsumerWidget {
   final AsyncValue<Position> posAsync;
   const _GpsBar({required this.posAsync});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final resolvedAddress = ref.watch(resolvedAddressProvider);
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -65,38 +67,65 @@ class _GpsBar extends StatelessWidget {
         border: Border.all(color: AppColors.border),
       ),
       child: posAsync.when(
-        data: (pos) => Row(
+        data: (pos) => Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 40, height: 40,
-              decoration: BoxDecoration(
-                color: AppColors.green.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.green.withOpacity(0.3)),
-              ),
-              child: const Center(child: Text('📍', style: TextStyle(fontSize: 18))),
+            Row(
+              children: [
+                Container(
+                  width: 40, height: 40,
+                  decoration: BoxDecoration(
+                    color: AppColors.green.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.green.withOpacity(0.3)),
+                  ),
+                  child: const Center(child: Text('📍', style: TextStyle(fontSize: 18))),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('GPS COORDINATES', style: TextStyle(fontFamily: 'monospace', fontSize: 9, color: AppColors.textDim, letterSpacing: 1.5)),
+                      Text(
+                        '${pos.latitude.toStringAsFixed(4)}° ${pos.latitude >= 0 ? 'N' : 'S'}, '
+                        '${pos.longitude.toStringAsFixed(4)}° ${pos.longitude >= 0 ? 'E' : 'W'}',
+                        style: const TextStyle(fontFamily: 'monospace', fontSize: 12, color: AppColors.green, letterSpacing: 0.5),
+                      ),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    const Text('ACCURACY', style: TextStyle(fontFamily: 'monospace', fontSize: 9, color: AppColors.textDim, letterSpacing: 1)),
+                    Text('±${pos.accuracy.toStringAsFixed(0)}m', style: const TextStyle(fontFamily: 'monospace', fontSize: 13, color: AppColors.yellow, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ],
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            if (resolvedAddress != null) ...[
+              const SizedBox(height: 10),
+              const Divider(color: AppColors.border, height: 1),
+              const SizedBox(height: 8),
+              Row(
                 children: [
-                  const Text('GPS COORDINATES', style: TextStyle(fontFamily: 'monospace', fontSize: 9, color: AppColors.textDim, letterSpacing: 1.5)),
-                  Text(
-                    '${pos.latitude.toStringAsFixed(4)}° ${pos.latitude >= 0 ? 'N' : 'S'}, '
-                    '${pos.longitude.toStringAsFixed(4)}° ${pos.longitude >= 0 ? 'E' : 'W'}',
-                    style: const TextStyle(fontFamily: 'monospace', fontSize: 12, color: AppColors.green, letterSpacing: 0.5),
+                  const Text('🏔️', style: TextStyle(fontSize: 14)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      resolvedAddress,
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 11,
+                        color: AppColors.green,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                   ),
                 ],
               ),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                const Text('ACCURACY', style: TextStyle(fontFamily: 'monospace', fontSize: 9, color: AppColors.textDim, letterSpacing: 1)),
-                Text('±${pos.accuracy.toStringAsFixed(0)}m', style: const TextStyle(fontFamily: 'monospace', fontSize: 13, color: AppColors.yellow, fontWeight: FontWeight.bold)),
-              ],
-            ),
+            ],
           ],
         ),
         loading: () => const Row(
