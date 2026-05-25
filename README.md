@@ -61,11 +61,13 @@ flutter pub run build_runner build --delete-conflicting-outputs
 
 ### 4. Add Audio Asset
 Place an audio file named `siren.mp3` in the `assets/audio/` directory.  
-You can download one for free from freesound.org (CC0 license) — search for "emergency siren".### 5. Configure AI Provider Integrations (Gemini, Claude, Grok)
+You can download one for free from freesound.org (CC0 license) — search for "emergency siren".
+
+### 5. Configure AI Provider Integrations (Gemini, Claude, Groq)
 SIGMA supports multiple premium AI engines. You can easily switch between providers directly in the app's AI tab:
-* **Gemini 2.0 Flash** (powered by Google AI Studio)
-* **Claude 3.5 Sonnet** (powered by Anthropic Console)
-* **Grok 2** (powered by xAI)
+* **Gemini** (powered by Google AI Studio)
+* **Claude** (powered by Anthropic Console)
+* **Groq** (powered by Groq Console)
 
 Open the app, navigate to the **AI** tab, tap the active model selector to choose your provider, tap **Settings (Gear Icon)** in the top right, and paste your API key. Keys are securely stored locally on your device's `SharedPreferences` and remain persistent across sessions.
 
@@ -99,13 +101,13 @@ All required permissions are already configured in the `AndroidManifest.xml` fil
 | `CAMERA` | Access LED torch for Morse code SOS strobe |
 | `VIBRATE` | Haptic feedback for SOS interactions |
 | `FOREGROUND_SERVICE` | Keeps GPS active when the app is in the background |
-| `INTERNET` | API requests for Gemini, Claude, and Grok integrations |
+| `INTERNET` | API requests for Gemini, Claude, and Groq integrations |
 
 ---
 
 ## 🧠 SIGMA AI Assistant — System Architecture
 
-SIGMA is configured as an elite wilderness and rescue assistant. The conversational brain dynamically supports Google, Anthropic, and xAI architectures with conversational history tracking (up to last 7 messages for conversational memory).
+SIGMA is configured as an elite wilderness and rescue assistant. The conversational brain dynamically supports Google, Anthropic, and Groq architectures with conversational history tracking (up to last 7 messages for conversational memory).
 
 Key prompt directions:
 - wilderness survival tactics (water extraction, signaling, shelter)
@@ -126,7 +128,8 @@ Key prompt directions:
 - [x] **Morse Code SOS LED Strobe Light** (hardware camera integration for visual beacons)
 - [x] **Loud Emergency Siren Audio** (high-frequency siren)
 - [x] **Sigma AI Assistant Screen** (active chat UI, Gemini 2.0 Flash, quick prompt suggestions)
-- [x] **Contacts Management Screen** (full Hive-backed CRUD operations for contacts)
+- [x] **Contacts Management Screen** (full Hive-backed CRUD operations for contacts with **Native Device Contacts Book Import**)
+- [x] **About / FAQ Dialog Panel** (custom app support overlay with developer donation details)
 - [x] **Activity Log Screen** (persistent database recording SOS and sensor trigger logs)
 - [x] **Offline Reverse Geocoding** (points database lookup)
 - [x] **Background GPS Foreground Service** (continues updating location in background)

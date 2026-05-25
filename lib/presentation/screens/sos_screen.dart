@@ -471,9 +471,9 @@ class _QuickActions extends ConsumerWidget {
           onTap: sos.toggleSiren,
         ),
         _QaButton(
-          icon: '📤', label: 'Send SOS SMS',
-          sub: '+ GPS COORDINATES', active: false,
-          onTap: () {/* open SMS modal */},
+          icon: 'ℹ️', label: 'About / FAQ',
+          sub: 'APP INFORMATION', active: false,
+          onTap: () => _showAboutFaqDialog(context),
         ),
         _QaButton(
           icon: '🗺', label: 'Location Info',
@@ -481,6 +481,103 @@ class _QuickActions extends ConsumerWidget {
           onTap: () => _showLocationInfo(context, posAsync),
         ),
       ],
+    );
+  }
+
+  void _showAboutFaqDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: AppColors.border),
+        ),
+        title: const Text(
+          'About / FAQ',
+          style: TextStyle(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+          ),
+        ),
+        content: const SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'S.O.S Panic Button',
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+              SizedBox(height: 4),
+              Text(
+                'An offline emergency app for mountain climbers, hikers, and general outdoor survival.',
+                style: TextStyle(color: AppColors.textDim, fontSize: 13, height: 1.4),
+              ),
+              SizedBox(height: 16),
+              Text(
+                'We truly appreciate your time using this app. Should you have any questions, suggestions, or encounter any issues, please feel free to reach out to us – we’d love to hear from you:',
+                style: TextStyle(color: AppColors.textDim, fontSize: 13, height: 1.4),
+              ),
+              SizedBox(height: 8),
+              Row(
+                children: [
+                  Text('📧 ', style: TextStyle(fontSize: 16)),
+                  Expanded(
+                    child: Text(
+                      'tac@yohanesfc.web.id',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        color: AppColors.green,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 16),
+              Text(
+                'If you find this app helpful and would like to support its continued development, your generosity would mean a great deal to us:',
+                style: TextStyle(color: AppColors.textDim, fontSize: 13, height: 1.4),
+              ),
+              SizedBox(height: 8),
+              Row(
+                children: [
+                  Text('🏦 ', style: TextStyle(fontSize: 16)),
+                  Expanded(
+                    child: Text(
+                      'BCA  ·  5000389341  ·  Yohanes Lengkong',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        color: AppColors.green,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 16),
+              Text(
+                'Thank you so much for your kind support! 🙏',
+                style: TextStyle(color: AppColors.textPrimary, fontSize: 13, fontWeight: FontWeight.w500),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('OK', style: TextStyle(color: AppColors.green, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
     );
   }
 
@@ -539,7 +636,7 @@ class _QuickActions extends ConsumerWidget {
                     width: double.infinity,
                     child: ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.green.withOpacity(0.15),
+                        backgroundColor: AppColors.green.withValues(alpha: 0.15),
                         foregroundColor: AppColors.green,
                         side: const BorderSide(color: AppColors.green),
                         padding: const EdgeInsets.symmetric(vertical: 12),

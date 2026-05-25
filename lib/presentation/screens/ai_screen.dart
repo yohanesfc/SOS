@@ -12,25 +12,25 @@ import '../../core/theme/app_colors.dart';
 // ── Providers ──
 enum AiProvider {
   gemini(
-    displayName: 'Gemini 2.0 Flash',
+    displayName: 'Gemini',
     modelName: 'gemini-2.0-flash',
     prefKey: 'gemini_api_key',
     developer: 'Google',
     logo: '♊',
   ),
   claude(
-    displayName: 'Claude 3.5 Sonnet',
+    displayName: 'Claude',
     modelName: 'claude-3-5-sonnet-20241022',
     prefKey: 'claude_api_key',
     developer: 'Anthropic',
     logo: '🎴',
   ),
-  grok(
-    displayName: 'Grok 2',
-    modelName: 'grok-2-1212',
-    prefKey: 'grok_api_key',
-    developer: 'xAI',
-    logo: '🌌',
+  groq(
+    displayName: 'Groq',
+    modelName: 'llama-3.3-70b-versatile',
+    prefKey: 'groq_api_key',
+    developer: 'Groq',
+    logo: '⚡',
   );
 
   final String displayName;
@@ -214,8 +214,8 @@ IMPORTANT: If asked something unrelated to emergencies/outdoors, politely redire
         reply = response.text ?? 'No response from SIGMA.';
       } else if (state.selectedProvider == AiProvider.claude) {
         reply = await _callClaude(userText, key);
-      } else if (state.selectedProvider == AiProvider.grok) {
-        reply = await _callGrok(userText, key);
+      } else if (state.selectedProvider == AiProvider.groq) {
+        reply = await _callGroq(userText, key);
       }
 
       final aiMsg = ChatMessage(text: reply, isUser: false, time: DateTime.now());
@@ -276,8 +276,8 @@ IMPORTANT: If asked something unrelated to emergencies/outdoors, politely redire
     return 'No response from Claude.';
   }
 
-  Future<String> _callGrok(String text, String apiKey) async {
-    final url = Uri.parse('https://api.x.ai/v1/chat/completions');
+  Future<String> _callGroq(String text, String apiKey) async {
+    final url = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
 
     final messagesPayload = <Map<String, dynamic>>[
       {'role': 'system', 'content': _systemPrompt}
@@ -301,7 +301,7 @@ IMPORTANT: If asked something unrelated to emergencies/outdoors, politely redire
         'content-type': 'application/json',
       },
       body: jsonEncode({
-        'model': AiProvider.grok.modelName,
+        'model': AiProvider.groq.modelName,
         'messages': messagesPayload,
         'temperature': 0.7,
       }),
@@ -310,15 +310,15 @@ IMPORTANT: If asked something unrelated to emergencies/outdoors, politely redire
     if (response.statusCode != 200) {
       final decoded = jsonDecode(utf8.decode(response.bodyBytes));
       final errMsg = decoded['error']?['message'] ?? 'Status ${response.statusCode}';
-      throw Exception('Grok error: $errMsg');
+      throw Exception('Groq error: $errMsg');
     }
 
     final decoded = jsonDecode(utf8.decode(response.bodyBytes));
     final choices = decoded['choices'] as List;
     if (choices.isNotEmpty) {
-      return choices[0]['message']?['content'] ?? 'No content from Grok.';
+      return choices[0]['message']?['content'] ?? 'No content from Groq.';
     }
-    return 'No response from Grok.';
+    return 'No response from Groq.';
   }
 
   void clearChat() {
@@ -574,16 +574,16 @@ class _AiScreenState extends ConsumerState<AiScreen> {
         linkUrl = 'https://aistudio.google.com';
         break;
       case AiProvider.claude:
-        desc = 'Emergency survival AI powered by Claude 3.5 Sonnet.\nEnter your Anthropic Console API key to activate.';
+        desc = 'Emergency survival AI powered by Claude.\nEnter your Anthropic Console API key to activate.';
         hint = 'sk-ant-api03...';
         linkText = 'Get API key at console.anthropic.com →';
         linkUrl = 'https://console.anthropic.com';
         break;
-      case AiProvider.grok:
-        desc = 'Emergency survival AI powered by Grok 2.\nEnter your xAI API key to activate.';
-        hint = 'xai-...';
-        linkText = 'Get API key at console.x.ai →';
-        linkUrl = 'https://console.x.ai';
+      case AiProvider.groq:
+        desc = 'Emergency survival AI powered by Groq.\nEnter your Groq API key to activate.';
+        hint = 'gsk_...';
+        linkText = 'Get API key at console.groq.com →';
+        linkUrl = 'https://console.groq.com';
         break;
     }
 
